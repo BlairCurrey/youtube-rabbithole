@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 import time
+import re
 import json
 
 def save_to_file(video_dictionary):
@@ -10,7 +11,9 @@ def save_to_file(video_dictionary):
 def youtube_dive(dives, start_video):
     video_list = []
 
-    for i in range(0, dives):
+    # Using '_' is the python convention for a placeholder variable (will not be referenced)
+    # https://stackoverflow.com/questions/52792987/unused-variable-in-a-for-loop
+    for _ in range(0, dives):
         next_video_data = find_next_video(start_video, video_list)
         video_list.append(next_video_data)
         start_video = next_video_data['next_link']
@@ -75,11 +78,48 @@ def find_next_video(start_video, history):
     #get the rest of the data
     video_data['title'] = soup.find('span', class_='watch-title').text.strip()
     video_data['channel'] = soup.find('div', class_='yt-user-info').text.strip()
-    video_data['category'] = soup.find('ul', class_='watch-info-tag-list').a.text.strip()
     video_data['views'] = soup.find(class_='view-count').text.strip()
+    video_data['category'] = get_category(soup)
+    
+    #Refactored - creates Video_data instance (overkill) and calls get_category method
+    # test = Video_data(start_video, history)
+    # video_data['category'] = test.get_category(soup)
 
     print(video_data)
     return video_data
+
+class Video_data:
+        def __init__(self, start_video, history):
+            self.start_video = start_video
+            self.history = history
+            self.data = {
+                "id": len(history) + 1,
+                "title": None,
+                "channel": None,
+                "views": None,
+                "category": None,
+                "link": start_video,
+                "next_link": None
+            }
+
+        def get_category(self, soup):
+            #find the h4 element with the text 'Category', then find it's parent
+            category_title = soup.find('h4', class_="title", text = re.compile('Category'))
+            parent = category_title.parent
+            #find category name from parent
+            category_value = parent.find('a').text.strip()
+
+            return category_value
+
+def get_category(soup):
+    
+    #find the h4 element with the text 'Category'
+    category_title = soup.find('h4', class_="title", text = re.compile('Category'))
+    parent = category_title.parent
+    #find category name
+    category_value = parent.find('a').text.strip()
+    
+    return category_value
 
 def get_next_video_html(soup, return_list=None):
     
@@ -105,5 +145,5 @@ def save_html(soup, url):
 if __name__ == "__main__":
 
     #search by video
-    rabbit_hole = youtube_dive(10, start_video="https://www.youtube.com/watch?v=R1KcSa39gkI")
+    rabbit_hole = youtube_dive(20, start_video="https://www.youtube.com/watch?v=R1KcSa39gkI")
     save_to_file(rabbit_hole)
