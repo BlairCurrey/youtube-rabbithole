@@ -63,6 +63,7 @@ class Rabbithole:
             
             # go back to the previous video in history and retry
             else:
+                #don't think this works (rarely gets triggered). see 'timeout_failure_log.txt'
                 previous_video = self.videos[-1]
                 print(f"Timeout. Going back 1 video to {previous_video}")
                 current_video = previous_video
@@ -87,7 +88,7 @@ class Rabbithole:
                     video['next_link'] = possible_new_link
         
         #get the rest of the data
-        scraped_video = Video_data(video['link'], video['next_link'], soup, len(self.videos))
+        scraped_video = Video_data(video['link'], video['next_link'], soup, len(self.videos) + 1)
 
         print(scraped_video.data)
         return scraped_video.data
@@ -152,8 +153,11 @@ class Video_data:
             return channel
 
         def find_views(self):
-            views = self.soup.find(class_='view-count').text.strip()
-            return views
+            views_str = self.soup.find(class_='view-count').text.strip()
+            views_split_str = views_str.split()[0]
+            views_split_str_no_comma = views_split_str.replace(',','')
+            views_num = int(views_split_str_no_comma)
+            return views_num
 
         def find_category(self):
             #find the h4 element with the text 'Category', then find it's parent
@@ -176,4 +180,5 @@ if __name__ == "__main__":
     }
 
     wolf_hunting = Rabbithole(examples["wolf_hunting"], 5)
-    wolf_hunting.save_json(name="wolf_hunting")
+    wolf_hunting.save_json()
+    # wolf_hunting.save_json(name="wolf_hunting")
