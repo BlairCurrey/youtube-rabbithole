@@ -12,7 +12,7 @@ class Rabbithole:
         self.go_down_rabbithole()
 
     def save_json(self, name="result"):
-        with open(f'{name}.json', 'w') as fp:
+        with open(f'results/{name}.json', 'w') as fp:
             json.dump(self.videos, fp, indent=4)
 
     def go_down_rabbithole(self):
@@ -63,10 +63,13 @@ class Rabbithole:
             
             # go back to the previous video in history and retry
             else:
-                #don't think this works (rarely gets triggered). see 'timeout_failure_log.txt'
+                #May not work ...
                 previous_video = self.videos[-1]
                 print(f"Timeout. Going back 1 video to {previous_video}")
                 current_video = previous_video
+                #remake soup and assign html
+                soup = self.get_soup(current_video)
+                next_video_html = self.get_next_video_html(soup)
 
         # get href and make link for next video
         next_video_href = next_video_html.get('href')
@@ -88,7 +91,7 @@ class Rabbithole:
                     video['next_link'] = possible_new_link
         
         #get the rest of the data
-        scraped_video = Video_data(video['link'], video['next_link'], soup, len(self.videos) + 1)
+        scraped_video = Video_data(video['link'], video['next_link'], soup, video['id'])
 
         print(scraped_video.data)
         return scraped_video.data
@@ -98,7 +101,7 @@ class Rabbithole:
         page = requests.get(current_video)
         
         # Print status code for debugging purposes
-        print(f"[{str(len(self.videos))}] Request status code for {current_video}: {str(page.status_code)}")
+        print(f"[{len(self.videos) + 1}] Request status code for {current_video}: {str(page.status_code)}")
         
         # Parse HTML
         return BeautifulSoup(page.content, 'html.parser')
@@ -116,6 +119,7 @@ class Rabbithole:
 class Video_data:
         def __init__(self, start_video, next_video, soup, id_num):
             self.soup = soup
+            self.failed_scrape_message = "[ERROR] Not Found"
             self.data = {
                 "id": id_num,
                 "title": None,
@@ -128,21 +132,10 @@ class Video_data:
             self.collect_data()
 
         def collect_data(self):
-            title = self.find_title()
-            title_checked = self.handle_failed_scrape(title)
-            self.data["title"] = title_checked
-
-            channel = self.find_channel()
-            channel_checked = self.handle_failed_scrape(channel)
-            self.data["channel"] = channel_checked
-
-            views = self.find_views()
-            views_checked = self.handle_failed_scrape(views)
-            self.data["views"] = views_checked
-
-            category = self.find_category()
-            category_checked = self.handle_failed_scrape(category)
-            self.data["category"] = category_checked
+            self.data["title"] = self.find_title()
+            self.data["channel"] = self.find_channel()
+            self.data["views"] = self.find_views()
+            self.data["category"] = self.find_category()
 
         def find_title(self):
             title = self.soup.find('span', class_='watch-title').text.strip()
@@ -153,11 +146,17 @@ class Video_data:
             return channel
 
         def find_views(self):
-            views_str = self.soup.find(class_='view-count').text.strip()
-            views_split_str = views_str.split()[0]
-            views_split_str_no_comma = views_split_str.replace(',','')
-            views_num = int(views_split_str_no_comma)
-            return views_num
+            views_str = self.soup.find(class_='watch-view-count')
+            # occasionally watch-view-count does not exist or doesn't 
+            # contain views (and the one displayed cannot be found in soup)
+            if views_str and self.has_numbers(views_str.text):
+                views_str_strip = views_str.text.strip()
+                views_split_str = views_str_strip.split()
+                views_split_str_no_comma = views_split_str[0].replace(',','')
+                views_num = int(views_split_str_no_comma)
+                return views_num
+            else:
+                return self.failed_scrape_message
 
         def find_category(self):
             #find the h4 element with the text 'Category', then find it's parent
@@ -167,18 +166,22 @@ class Video_data:
             category = parent.find('a').text.strip()
             return category
 
-        def handle_failed_scrape(self, soup_find_return):
-            if soup_find_return is not None:
-                return soup_find_return
-            else:
-                return "[ERROR] Not Found"
+        def has_numbers(self, inputString):
+            return any(char.isdigit() for char in inputString)
 
 if __name__ == "__main__":
     examples = {
         "wolf_hunting": "https://www.youtube.com/watch?v=hMIGbEfikGQ",
-        "larry_bird": "https://www.youtube.com/watch?v=R1KcSa39gkI"
+        "larry_bird": "https://www.youtube.com/watch?v=R1KcSa39gkI",
+        "ancient_aliens": "https://www.youtube.com/watch?v=AdsBmlejPGA",
+        "ray_mears": "https://www.youtube.com/watch?v=UsbSMplJ6g4",
+        "forklift_safety": "https://www.youtube.com/watch?v=fPhynD2yuBE"
     }
 
-    wolf_hunting = Rabbithole(examples["wolf_hunting"], 5)
-    wolf_hunting.save_json()
-    # wolf_hunting.save_json(name="wolf_hunting")
+    for key in examples:
+        dives = 10
+        test = Rabbithole(examples[key], dives)
+        test.save_json(name=f"{key}-{dives}")
+    
+    # test = Rabbithole("https://www.youtube.com/watch?v=yFYb5Pk3LUM", 5)
+    # test.save_json(name="forklift_safety-500")
