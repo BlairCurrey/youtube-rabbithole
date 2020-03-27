@@ -27,75 +27,35 @@ class Rabbithole:
         return self.videos
 
     def find_next_video(self, current_video):
-        """
-        Could potentially be refactored to check that soup retrieval was succesful and the 
-        next video html is accesible and not a duplicate. Could move video data structure 
-        and video data retrieval to a new class.
-        """
         # stores data for current video
         video = {
             "id": len(self.videos) + 1,
             "link": current_video,
             "next_link": None,
-            "title": None,
-            "channel": None,
-            "views": None,
-            "category": None
+            "soup": None
         }
 
-        # Find the next video html
-        soup = self.get_soup(current_video)
-        next_video_html = self.get_next_video_html(soup)
+        # Get soup and find the next video html
+        video["soup"] = self.get_soup(video["link"])
+        next_video_html = self.find_next_video_html(video["soup"])
+        
+        #Find new video html and soup if first attempt yields None
+        if next_video_html is None:
+            next_video_html, video["soup"] = self.retry_find_next_video_html(video["soup"], video["link"], next_video_html)
+        
+        # Make link
+        video['next_link'] = self.make_link_from_html(next_video_html)
 
-        # set timeout and counter 
-        timeout = 6
-        counter = 0
-        # make sure next_video_html exists
-        while not next_video_html:
-            print("Retrying....")
-            
-            counter += 1
-            
-            # try until counter exceeds timeout
-            if counter <= timeout:
-                soup = self.get_soup(current_video)
-                next_video_html = self.get_next_video_html(soup)
-            
-            # go back to the previous video in history and retry
-            else:
-                #May not work ...
-                previous_video = self.videos[-1]
-                print(f"Timeout. Going back 1 video to {previous_video}")
-                current_video = previous_video
-                #remake soup and assign html
-                soup = self.get_soup(current_video)
-                next_video_html = self.get_next_video_html(soup)
-
-        # get href and make link for next video
-        next_video_href = next_video_html.get('href')
-        video['next_link'] = 'https://www.youtube.com' + next_video_href
-
-        # Checks if next link is present in our list of dictionaries (history)
-        # adapted code from https://stackoverflow.com/questions/3897499/check-if-value-already-exists-within-list-of-dictionaries
-        if any(d['link'] == video['next_link'] for d in self.videos):
-            print(f"{video['next_link']} is a duplicate - Retrying ...")
-            # get html snippets for all the videos
-            videos_html = self.get_next_video_html(soup, return_list=True)
-            
-            # make a new possible link from the list of videos
-            for i in range(0, len(videos_html)):
-                possible_new_link = 'https://www.youtube.com' + videos_html[i].get('href')
-                
-                #if the new possible link has not been visited, make it the next video
-                if not any(d['link'] == possible_new_link for d in self.videos):
-                    video['next_link'] = possible_new_link
+        #Find new video if video is a duplicate
+        if self.video_is_duplicate(video['next_link']):
+            video['next_link'] = self.find_non_duplicate_video(video["soup"])
         
         #get the rest of the data
-        scraped_video = Video_data(video['link'], video['next_link'], soup, video['id'])
+        scraped_video = Video_data(video['link'], video['next_link'], video["soup"], video['id'])
 
         print(scraped_video.data)
         return scraped_video.data
-
+    
     def get_soup(self, current_video):
         # Get web page
         page = requests.get(current_video)
@@ -106,15 +66,57 @@ class Rabbithole:
         # Parse HTML
         return BeautifulSoup(page.content, 'html.parser')
 
-    def get_next_video_html(self, soup, return_list=None):
-        """ This could probably be reworked to use try/except blocks
-        Get rid of return_list argument and move logic from find_next-video
-        to detect success of html retrieval here.
-        """
-        if return_list == None:
+    def find_next_video_html(self, soup, retry_with_new_soup=False):
             return soup.find('a', class_='content-link')
+
+    def retry_find_next_video_html(self, soup, current_video, html):
+        attempts = 0
+        threshold = 5
+
+        while attempts < threshold:
+            attempts += 1
+            
+            if html is None:
+                print("Failed to get next video. Making new soup and Retrying ...")
+                new_soup = self.get_soup(current_video)
+                html = self.find_next_video_html(new_soup)
+                if html:
+                    return html, new_soup
+            else:
+                print(f"Could not find video html in {threshold} attempts")
+    
+    def find_next_video_html_list(self, soup):
+        return soup.find_all('a', class_='content-link')
+    
+    def make_link_from_html(self, validated_html):
+        href = validated_html.get('href')
+        return 'https://www.youtube.com' + href
+
+    def video_is_duplicate(self, next_link):
+        #check if next_link is found in self.videos
+        if any(v['link'] == next_link for v in self.videos):
+            print(f"{next_link} is a duplicate \n Retrying ...")
+            return True
         else:
-            return soup.find_all('a', class_='content-link') # should work without 'a' argument   
+            return False
+
+    def find_non_duplicate_video(self, soup):
+        next_video_html_list = self.find_next_video_html_list(soup)
+            
+        # make a new possible link from the list of videos (skipping the first video that we already tried)
+        for item in range(1, len(next_video_html_list)):
+            # possible_new_link = 'https://www.youtube.com' + videos_html[i].get('href')
+            possible_new_link = self.make_link_from_html(next_video_html_list[item]) 
+            possible_new_link_is_duplicate = self.video_is_duplicate(possible_new_link)
+
+            # #if the new possible link has not been visited, make it the next video
+            if not possible_new_link_is_duplicate:
+                print(f"found new valid link: {possible_new_link}")
+                return possible_new_link
+            else:
+                print(f"Possible new link ({possible_new_link}) is a duplicate. Retrying...")
+
+        print(f"Could not find new link that was not a duplicate from: \n {next_video_html_list}")
 
 class Video_data:
         def __init__(self, start_video, next_video, soup, id_num):
@@ -147,6 +149,7 @@ class Video_data:
 
         def find_views(self):
             views_str = self.soup.find(class_='watch-view-count')
+            
             # occasionally watch-view-count does not exist or doesn't 
             # contain views (and the one displayed cannot be found in soup)
             if views_str and self.has_numbers(views_str.text):
@@ -160,9 +163,9 @@ class Video_data:
 
         def find_category(self):
             #find the h4 element with the text 'Category', then find it's parent
-            category_title = self.soup.find('h4', class_="title", text = re.compile('Category'))
+            category_title = self.soup.find('h4', class_='title', text = re.compile('Category'))
+            #Find category value from parent
             parent = category_title.parent
-            #find category name from parent
             category = parent.find('a').text.strip()
             return category
 
@@ -182,6 +185,3 @@ if __name__ == "__main__":
         dives = 10
         test = Rabbithole(examples[key], dives)
         test.save_json(name=f"{key}-{dives}")
-    
-    # test = Rabbithole("https://www.youtube.com/watch?v=yFYb5Pk3LUM", 5)
-    # test.save_json(name="forklift_safety-500")
