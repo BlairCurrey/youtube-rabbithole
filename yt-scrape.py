@@ -4,7 +4,7 @@ import time
 import re
 import json
 
-class Rabbithole:
+class RabbitHole:
     def __init__(self, start_video, dives):
         self.start_video = start_video
         self.dives = dives
@@ -50,7 +50,7 @@ class Rabbithole:
         video["next_link"] = self.make_link_from_html(next_video_html)
         
         #get the rest of the data
-        scraped_video = Video_data(video['link'], video['next_link'], video["soup"], video['id'])
+        scraped_video = VideoData(video['link'], video['next_link'], video["soup"], video['id'])
 
         print(scraped_video.data)
         return scraped_video.data
@@ -124,7 +124,7 @@ class Rabbithole:
         
         print("Could not find valid next video html from list")
 
-class Video_data:
+class VideoData:
         def __init__(self, start_video, next_video, soup, id_num):
             self.soup = soup
             self.failed_scrape_message = "[ERROR] Not Found"
@@ -189,5 +189,5 @@ if __name__ == "__main__":
 
     for key in examples:
         dives = 30
-        test = Rabbithole(examples[key], dives)
+        test = RabbitHole(examples[key], dives)
         test.save_json(name=f"{key}-{dives}")
