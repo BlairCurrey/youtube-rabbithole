@@ -3,6 +3,7 @@ import requests
 import time
 import re
 import json
+import logging
 
 class RabbitHole:
     def __init__(self, start_video_url, dives):
@@ -21,10 +22,7 @@ class RabbitHole:
 
         for _ in range(0, self.dives):
             next_video = NextVideo(current_video_url, self.visited_videos)
-            next_video_scrape = VideoData(next_video.video["url"], 
-                                            next_video.video["next_url"], 
-                                            next_video.video["soup"], 
-                                            next_video.video["id"])
+            next_video_scrape = VideoData(next_video.video["url"], next_video.video["next_url"], next_video.video["soup"], next_video.video["id"])
             self.visited_videos.append(next_video_scrape.data)
             current_video_url = next_video_scrape.data["next_url"]
         
@@ -49,10 +47,12 @@ class NextVideo:
         
         # Find new video html (which also changes self.soup) if first attempt yields None
         if next_video_html is None:
+            logging.debug("Failed to find next video html from soup")
             next_video_html = self.retry_find_next_video_html(next_video_html)
 
         # Find new video if it is a YouTube Movie or duplicate
         if self.video_is_youtube_movie(next_video_html) or self.video_is_duplicate(next_video_html):
+            logging.debug("Retrying ...")
             next_video_html = self.pick_next_video_html_from_list()
         
         self.video["next_url"] = self.make_url_from_html(next_video_html)
@@ -62,15 +62,18 @@ class NextVideo:
         page = requests.get(self.video["url"])
         
         # Print status code for debugging purposes
-        print(f"[{len(self.visited_videos) + 1}] Request status code for {self.video['url']}: {str(page.status_code)}")
+        logging.debug(f"[{len(self.visited_videos) + 1}] Request status code for {self.video['url']}: {str(page.status_code)}")
+        logging.debug("Making soup...")
         
         # Parse HTML
         return BeautifulSoup(page.content, 'html.parser')
 
     def find_next_video_html(self):
+        logging.debug("Searching for next video html...")
         return self.video["soup"].find('a', class_='content-link')
         
     def find_next_video_html_list(self):
+        logging.debug("Searching for next video html list")
         return self.video["soup"].find_all('a', class_='content-link')
 
     def retry_find_next_video_html(self, next_video_html):
@@ -81,28 +84,29 @@ class NextVideo:
             attempts += 1
             
             if next_video_html is None:
-                print("Failed to get next video. Making new soup and Retrying ...")
+                logging.debug(f"{(attempts)}Failed to get next video. Making new soup and Retrying ...")
                 self.video["soup"] = self.get_soup()
                 next_video_html = self.find_next_video_html()
                 if next_video_html:
+                    logging.debug(f"Found next video html after {attempts} attempts")
                     return next_video_html
             else:
-                print(f"Could not find video html in {threshold} attempts")
+                logging.critical(f"Could not find video html in {threshold} attempts")
 
-    def video_is_youtube_movie(self, next_video_html): 
+    def video_is_youtube_movie(self, next_video_html):
         next_video_html_subtext = next_video_html.find('span', class_='')
         
         if next_video_html_subtext and next_video_html_subtext.text == "YouTube Movies":
-            print("next video html is for a YouTube Movie \n Retrying ...")
+            logging.debug("Next video html is for a YouTube Movie.")
             return True
         else:
             return False  
 
     def video_is_duplicate(self, next_video_html):
             next_url = self.make_url_from_html(next_video_html)
-            #check if next_url is found in the visited videos list
+            #check if next_url is found in self.videos
             if any(v["url"] == next_url for v in self.visited_videos):
-                print(f"{next_url} is a duplicate \n Retrying ...")
+                logging.debug(f"{next_url} is a duplicate.")
                 return True
             else:
                 return False  
@@ -116,11 +120,12 @@ class NextVideo:
                 new_html_is_duplicate = self.video_is_duplicate(new_html)
 
                 if not new_html_is_duplicate and not new_html_is_youtube_movie:
+                    logging.debug("Found new valid html")
                     return new_html
                 else:
-                    print("New next video html is not valid. Retrying ...")
+                    logging.debug("New next video html is not valid. Retrying ...")
             
-            print("Could not find valid next video html from list")
+            logging.critical("Could not find valid next video html from list")
                 
     def make_url_from_html(self, next_video_html):
         href = next_video_html.get('href')
@@ -146,7 +151,8 @@ class VideoData:
             self.data["channel"] = self.find_channel()
             self.data["views"] = self.find_views()
             self.data["category"] = self.find_category()
-            print(self.data)
+
+            logging.debug(f"Scrape complete: {self.data}")
 
         def find_title(self):
             title = self.soup.find('span', class_='watch-title').text.strip()
@@ -168,6 +174,7 @@ class VideoData:
                 views_num = int(views_split_str_no_comma)
                 return views_num
             else:
+                logging.info(f"Failed to scrape views for {self.data['url']}. Returning error message in place.")
                 return self.failed_scrape_message
 
         def find_category(self):
@@ -189,6 +196,15 @@ if __name__ == "__main__":
         "ray_mears": "https://www.youtube.com/watch?v=UsbSMplJ6g4",
         "forklift_safety": "https://www.youtube.com/watch?v=fPhynD2yuBE"
     }
+
+    #logging options
+    logging.basicConfig(filename="logfile", level=logging.DEBUG,
+        format="%(asctime)s:%(levelname)s:%(message)s")
+
+    # raise level of chardet.charsetprober and urllib3.connectionpool to prevent their debug logs
+    #https://stackoverflow.com/questions/48429257/python-requests-module-logging-of-encoding
+    logging.getLogger('chardet.charsetprober').setLevel(logging.INFO)
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.INFO)
 
     for key in examples:
         dives = 30
