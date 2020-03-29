@@ -14,6 +14,7 @@ This python program takes a youtube video url as input and a number of "dives" a
  - time
  - json
  - re
+ - logging
 
 ## Error Handling
 This program encounters several errors when scraping youtube. Generally speaking, my aim is to find the information if it exists, skip it if it doesn't, and only change the current video if there is no other way to proceed to the next one. Here are such errors and how my program handles them:
