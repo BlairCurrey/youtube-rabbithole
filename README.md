@@ -1,5 +1,5 @@
 # Rabbit hole
-a metaphor for something that transports someone into a wonderfully (or troublingly) surreal state or situation
+*a metaphor for something that transports someone into a wonderfully (or troublingly) surreal state or situation*
 #
 Have you ever started watching something on Youtube and ended up engrossed in a completely unrelated video? Or have you ever read a comment on a video that proclaimed something to the effect of "It's 2am on a Tuesday and I have no experience with carpentry but I can't stop learning about Japanese hardware-less joinery techniques"
 
