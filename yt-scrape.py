@@ -31,12 +31,11 @@ class RabbitHole:
 class NextVideo:
     def __init__(self, current_video_url, visited_videos):
         self.visited_videos = visited_videos
-        # self.next_video_html = None
         self.video = {
             "id": len(visited_videos) + 1,
             "url": current_video_url,
             "next_url": None,
-            "soup": None  
+            "soup": None
         }
         self.get_next_video()
 
@@ -44,7 +43,7 @@ class NextVideo:
         # Get soup and find the next video html
         self.video["soup"] = self.get_soup()
         next_video_html = self.find_next_video_html()
-        
+
         # Find new video html (which also changes self.soup) if first attempt yields None
         if next_video_html is None:
             logging.debug("Failed to find next video html from soup")
@@ -54,24 +53,24 @@ class NextVideo:
         if self.video_is_youtube_movie(next_video_html) or self.video_is_duplicate(next_video_html):
             logging.debug("Retrying ...")
             next_video_html = self.pick_next_video_html_from_list()
-        
+
         self.video["next_url"] = self.make_url_from_html(next_video_html)
 
     def get_soup(self):
         # Get web page
         page = requests.get(self.video["url"])
-        
+
         # Print status code for debugging purposes
         logging.debug(f"[{len(self.visited_videos) + 1}] Request status code for {self.video['url']}: {str(page.status_code)}")
         logging.debug("Making soup...")
-        
+
         # Parse HTML
         return BeautifulSoup(page.content, 'html.parser')
 
     def find_next_video_html(self):
         logging.debug("Searching for next video html...")
         return self.video["soup"].find('a', class_='content-link')
-        
+
     def find_next_video_html_list(self):
         logging.debug("Searching for next video html list")
         return self.video["soup"].find_all('a', class_='content-link')
@@ -82,7 +81,7 @@ class NextVideo:
 
         while attempts < threshold:
             attempts += 1
-            
+
             if next_video_html is None:
                 logging.debug(f"{(attempts)}Failed to get next video. Making new soup and Retrying ...")
                 self.video["soup"] = self.get_soup()
@@ -95,7 +94,7 @@ class NextVideo:
 
     def video_is_youtube_movie(self, next_video_html):
         next_video_html_subtext = next_video_html.find('span', class_='')
-        
+
         if next_video_html_subtext and next_video_html_subtext.text == "YouTube Movies":
             logging.debug("Next video html is for a YouTube Movie.")
             return True
@@ -113,7 +112,7 @@ class NextVideo:
 
     def pick_next_video_html_from_list(self):
             next_video_html_list = self.find_next_video_html_list()
-                
+
             for i in range(1, len(next_video_html_list)):
                 new_html = next_video_html_list[i]
                 new_html_is_youtube_movie = self.video_is_youtube_movie(new_html)
@@ -124,9 +123,9 @@ class NextVideo:
                     return new_html
                 else:
                     logging.debug("New next video html is not valid. Retrying ...")
-            
+
             logging.critical("Could not find valid next video html from list")
-                
+
     def make_url_from_html(self, next_video_html):
         href = next_video_html.get('href')
         return 'https://www.youtube.com' + href
@@ -164,7 +163,7 @@ class VideoData:
 
         def find_views(self):
             views_str = self.soup.find(class_='watch-view-count')
-            
+
             # occasionally watch-view-count does not exist or doesn't 
             # contain views (and the one displayed cannot be found in soup)
             if views_str and self.has_numbers(views_str.text):
