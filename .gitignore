@@ -1,0 +1,6 @@
+.vscode/
+debugging/
+logfile
+results/
+test.py
+yt-scrape-dev.py
