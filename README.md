@@ -7,14 +7,51 @@ Well, why not kill all the fun and get straight to the bottom of these time-wast
 
 This python program takes a youtube video url as input and a number of "dives" and continues on to the next recommended video that many times. It returns a list of dictionaries which contain data for each video (title, channel name, url, etc).
 
-**Libraries used** 
 
- - BeautifulSoup
- - requests
- - time
- - json
- - re
- - logging
+
+## Example
+
+```python
+dives=30
+rh = RabbitHole("https://www.youtube.com/watch?v=UsbSMplJ6g4", dives)
+rh.save_json(name=f"{ray_mears}-{dives}")
+```
+
+`ray_mears-30.json`:
+ ```json
+ [
+    {
+        "id": 1,
+        "title": "Building a Shelter - Ray Mears Extreme Survival - BBC",
+        "channel": "BBC Studios",
+        "views": 651230,
+        "category": "Travel & Events",
+        "url": "https://www.youtube.com/watch?v=UsbSMplJ6g4",
+        "next_url": "https://www.youtube.com/watch?v=4ksyivTxZzw"
+    },
+    {
+        "id": 2,
+        "title": "Ray Mears - How to bake bread in the outdoors, Wild Food",
+        "channel": "Ray Mears & Woodlore Ltd.",
+        "views": 618882,
+        "category": "Education",
+        "url": "https://www.youtube.com/watch?v=4ksyivTxZzw",
+        "next_url": "https://www.youtube.com/watch?v=xcw0T1yjxIU"
+    },
+    {
+        "id": 3,
+        "title": "Campfire Bread in the Dutch Oven.  Black Pudding.  Plough Point Tarp Shelter.",
+        "channel": "Simon, a bloke in the woods",
+        "views": 570778,
+        "category": "People & Blogs",
+        "url": "https://www.youtube.com/watch?v=xcw0T1yjxIU",
+        "next_url": "https://www.youtube.com/watch?v=PDPIfsm52T4"
+    },
+    
+    ...
+
+] 
+```
 
 ## Error Handling
 This program encounters several errors when scraping youtube. Generally speaking, my aim is to find the information if it exists, skip it if it doesn't, and only change the current video if there is no other way to proceed to the next one. Here are such errors and how my program handles them:
