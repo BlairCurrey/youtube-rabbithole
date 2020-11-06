@@ -53,6 +53,9 @@ rh.save_json(name=f"{ray_mears}-{dives}")
 ] 
 ```
 
+## Analysis
+From this data, I have created a similarity matrix where each title is compared to eachother for similar using [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) in [this juypter notebook.](data-analysis.ipynb)
+
 ## Error Handling
 This program encounters several errors when scraping youtube. Generally speaking, my aim is to find the information if it exists, skip it if it doesn't, and only change the current video if there is no other way to proceed to the next one. Here are such errors and how my program handles them:
 
