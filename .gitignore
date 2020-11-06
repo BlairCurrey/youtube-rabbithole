@@ -4,3 +4,4 @@ logfile
 results/
 test.py
 yt-scrape-dev.py
+.ipynb_checkpoints/
